@@ -1,0 +1,3 @@
+image:
+  repository: ghcr.io/your-org/user-service
+  tag: latest

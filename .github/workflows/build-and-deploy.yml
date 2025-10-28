@@ -1,0 +1,40 @@
+name: Build and Deploy Microservice
+
+on:
+  repository_dispatch:
+    types: [microservice-updated]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout orchestration repo
+        uses: actions/checkout@v4
+
+      - name: Log incoming payload
+        run: |
+          echo "Service: ${{ github.event.client_payload.service }}"
+          echo "Commit: ${{ github.event.client_payload.commit }}"
+          echo "Repo: ${{ github.event.client_payload.repo }}"
+
+      - name: Clone microservice repo
+        run: |
+          git clone https://github.com/${{ github.event.client_payload.repo }} service-code
+          cd service-code
+          git checkout ${{ github.event.client_payload.commit }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t ghcr.io/your-org/${{ github.event.client_payload.service }}:${{ github.event.client_payload.commit }} .
+
+      - name: Push Docker image
+        run: |
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u your-org --password-stdin
+          docker push ghcr.io/your-org/${{ github.event.client_payload.service }}:${{ github.event.client_payload.commit }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          helm upgrade --install ${{ github.event.client_payload.service }} ./helm/${{ github.event.client_payload.service }} \
+            --set image.tag=${{ github.event.client_payload.commit }} \
+            --kubeconfig "${{ secrets.KUBE_CONFIG }}"
