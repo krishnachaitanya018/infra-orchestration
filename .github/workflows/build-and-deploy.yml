@@ -26,15 +26,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/your-org/${{ github.event.client_payload.service }}:${{ github.event.client_payload.commit }} .
+          cd service-code
+          docker build -t ghcr.io/krishnachaitanya018/${{ github.event.client_payload.service }}:${{ github.event.client_payload.commit }} .
 
       - name: Push Docker image
         run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u your-org --password-stdin
-          docker push ghcr.io/your-org/${{ github.event.client_payload.service }}:${{ github.event.client_payload.commit }}
-
-      - name: Deploy to Kubernetes
-        run: |
-          helm upgrade --install ${{ github.event.client_payload.service }} ./helm/${{ github.event.client_payload.service }} \
-            --set image.tag=${{ github.event.client_payload.commit }} \
-            --kubeconfig "${{ secrets.KUBE_CONFIG }}"
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u krishnachaitanya018 --password-stdin
+          docker push ghcr.io/krishnachaitanya018/${{ github.event.client_payload.service }}:${{ github.event.client_payload.commit }}
