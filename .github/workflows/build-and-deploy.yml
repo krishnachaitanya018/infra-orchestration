@@ -42,7 +42,6 @@ jobs:
 
       # Optional deployment step — only needed if you have Kubernetes
       - name: Deploy to Kubernetes
-        if: ${{ secrets.KUBE_CONFIG != '' }}
         run: |
           echo "Deploying ${{ github.event.client_payload.service }} to Kubernetes..."
           helm upgrade --install ${{ github.event.client_payload.service }} ./helm/${{ github.event.client_payload.service }} \
