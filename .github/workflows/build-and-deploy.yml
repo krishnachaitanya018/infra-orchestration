@@ -42,7 +42,18 @@ jobs:
       - name: Deploy to Kubernetes
         run: |
           echo "Deploying ${{ github.event.client_payload.service }} to Kubernetes..."
+          
+          # Write kubeconfig secret content to a file
+          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig.yaml
+          
+          # Convert \n to real newlines (required on GitHub Actions)
+          sed -i 's/\\n/\n/g' kubeconfig.yaml
+          
+          # Verify cluster connection (optional check)
+          kubectl --kubeconfig=kubeconfig.yaml get nodes
+          
+          # Deploy using Helm
           helm upgrade --install ${{ github.event.client_payload.service }} ./helm/${{ github.event.client_payload.service }} \
             --set image.repository=ghcr.io/krishnachaitanya018/${{ github.event.client_payload.service }} \
             --set image.tag=${{ github.event.client_payload.commit }} \
-            --kubeconfig "${{ secrets.KUBE_CONFIG }}"
+            --kubeconfig kubeconfig.yaml
