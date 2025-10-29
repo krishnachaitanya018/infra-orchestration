@@ -6,10 +6,12 @@ on:
 
 jobs:
   build-deploy:
-    runs-on: ubuntu-latest
-
+    runs-on: self-hosted
     env:
-      IMAGE_TAG: ghcr.io/krishnachaitanya018/${{ github.event.client_payload.service }}:${{ github.event.client_payload.commit }}
+      REGISTRY: ghcr.io/krishnachaitanya018
+      IMAGE_TAG: ${{ github.event.client_payload.commit }}
+      SERVICE_NAME: ${{ github.event.client_payload.service }}
+      REPO_URL: ${{ github.event.client_payload.repo }}
 
     steps:
       - name: Checkout orchestration repo
@@ -17,43 +19,42 @@ jobs:
 
       - name: Log incoming payload
         run: |
-          echo "Service: ${{ github.event.client_payload.service }}"
-          echo "Commit: ${{ github.event.client_payload.commit }}"
-          echo "Repo: ${{ github.event.client_payload.repo }}"
+          echo "Triggered by: $REPO_URL"
+          echo "Service: $SERVICE_NAME"
+          echo "Commit: $IMAGE_TAG"
 
       - name: Clone microservice repo
         run: |
-          git clone https://github.com/${{ github.event.client_payload.repo }} service-code
+          echo "Cloning $REPO_URL..."
+          git clone https://github.com/$REPO_URL service-code
           cd service-code
-          git checkout ${{ github.event.client_payload.commit }}
+          git checkout $IMAGE_TAG
+          echo "Checked out commit: $IMAGE_TAG"
 
       - name: Build Docker image
         run: |
           cd service-code
-          echo "🏗️ Building Docker image: $IMAGE_TAG"
-          docker build -t $IMAGE_TAG .
+          echo "Building Docker image..."
+          docker build -t $REGISTRY/$SERVICE_NAME:$IMAGE_TAG .
+          docker images | grep $SERVICE_NAME
 
-      - name: Push Docker image
+      - name: Push Docker image to GHCR
         run: |
           echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u krishnachaitanya018 --password-stdin
-          echo "Pushing Docker image: $IMAGE_TAG"
-          docker push $IMAGE_TAG
+          echo "Pushing image $REGISTRY/$SERVICE_NAME:$IMAGE_TAG..."
+          docker push $REGISTRY/$SERVICE_NAME:$IMAGE_TAG
 
-      - name: Deploy to Kubernetes
+      - name: Helm Deploy to Minikube
         run: |
-          echo "Deploying ${{ github.event.client_payload.service }} to Kubernetes..."
-          
-          # Write kubeconfig secret content to a file
-          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig.yaml
-          
-          # Convert \n to real newlines (required on GitHub Actions)
-          sed -i 's/\\n/\n/g' kubeconfig.yaml
-          
-          # Verify cluster connection (optional check)
-          kubectl --kubeconfig=kubeconfig.yaml get nodes
-          
-          # Deploy using Helm
-          helm upgrade --install ${{ github.event.client_payload.service }} ./helm/${{ github.event.client_payload.service }} \
-            --set image.repository=ghcr.io/krishnachaitanya018/${{ github.event.client_payload.service }} \
-            --set image.tag=${{ github.event.client_payload.commit }} \
-            --kubeconfig kubeconfig.yaml
+          echo "Deploying $SERVICE_NAME to local Minikube cluster..."
+          helm upgrade --install $SERVICE_NAME ./helm/$SERVICE_NAME \
+            --set image.repository=$REGISTRY/$SERVICE_NAME \
+            --set image.tag=$IMAGE_TAG \
+            --wait --timeout 60s
+
+      - name: 🔎 Verify Deployment
+        run: |
+          echo "Checking pods and services..."
+          kubectl get pods
+          kubectl get svc
+          echo "Deployment complete for $SERVICE_NAME ✅"
