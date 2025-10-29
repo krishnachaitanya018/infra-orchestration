@@ -6,6 +6,7 @@ on:
 
 jobs:
   build-deploy:
+    name: Build and Push Docker Image
     runs-on: self-hosted
     env:
       REGISTRY: ghcr.io/krishnachaitanya018
@@ -44,13 +45,36 @@ jobs:
           echo "Pushing image $REGISTRY/$SERVICE_NAME:$IMAGE_TAG..."
           docker push $REGISTRY/$SERVICE_NAME:$IMAGE_TAG
 
+
+  helm-deploy:
+    name: Helm Deploy to Minikube
+    runs-on: self-hosted
+    needs: build-deploy
+    steps:
+      - name: Check Minikube status
+        run: |
+          echo "🔍 Checking if Minikube is running..."
+          if ! minikube status | grep -q "Running"; then
+            echo "⚠️  Minikube not running. Starting Minikube..."
+            minikube start
+          else
+            echo "✅ Minikube is already running."
+          fi
+          echo "Current context:"
+          kubectl config current-context
+          kubectl get nodes
+
       - name: Helm Deploy to Minikube
         run: |
-          echo "Deploying $SERVICE_NAME to local Minikube cluster..."
+          echo "🚀 Deploying $SERVICE_NAME to local Minikube cluster..."
           helm upgrade --install $SERVICE_NAME ./helm/$SERVICE_NAME \
             --set image.repository=$REGISTRY/$SERVICE_NAME \
             --set image.tag=$IMAGE_TAG \
-            --wait --timeout 60s
+            --wait --timeout 180s
+        env:
+          REGISTRY: ghcr.io/krishnachaitanya018
+          IMAGE_TAG: ${{ github.event.client_payload.commit }}
+          SERVICE_NAME: user-service
 
       - name: 🔎 Verify Deployment
         run: |
