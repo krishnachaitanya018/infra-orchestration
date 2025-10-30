@@ -1,4 +1,4 @@
-name: Build and Store Microservice Image — ${{ github.event.client_payload.service }}
+name: Build and Store Microservice Image
 
 on:
   repository_dispatch:
